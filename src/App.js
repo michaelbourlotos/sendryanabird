@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useCallback } from "react";
 import * as mobilenet from "@tensorflow-models/mobilenet";
+import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import * as tf from "@tensorflow/tfjs";
 import "./App.css";
 
 function App() {
   const [image, setImage] = useState(null);
   const [message, setMessage] = useState("");
-  const [model, setModel] = useState(null);
+  const [mobilenetModel, setMobilenetModel] = useState(null);
+  const [cocoModel, setCocoModel] = useState(null);
   const [lastImages, setLastImages] = useState([]);
   const [birdImage, setBirdImage] = useState(null);
   const [sending, setSending] = useState(false);
+  const [showSendAnyway, setShowSendAnyway] = useState(false);
 
   const birdClasses = [
     "cock",
@@ -101,12 +104,22 @@ function App() {
   }, [workerUrl]);
 
   useEffect(() => {
-    const loadModel = async () => {
-      const loadedModel = await mobilenet.load({ version: 2, alpha: 1.0 });
-      setModel(loadedModel);
+    const loadModels = async () => {
+      try {
+        // Load both models in parallel
+        const [loadedMobilenet, loadedCoco] = await Promise.all([
+          mobilenet.load({ version: 2, alpha: 1.0 }),
+          cocoSsd.load()
+        ]);
+        setMobilenetModel(loadedMobilenet);
+        setCocoModel(loadedCoco);
+      } catch (error) {
+        console.error('Error loading models:', error);
+        setMessage('Error loading AI models. Please refresh the page.');
+      }
     };
 
-    loadModel();
+    loadModels();
     fetchLastImages();
   }, [fetchLastImages]);
 
@@ -127,6 +140,7 @@ function App() {
                 ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
                 const jpegImage = canvas.toDataURL('image/jpeg', 0.5);
                 setImage(jpegImage);
+                setShowSendAnyway(false);
                 classifyImage(imgElement);
             };
         };
@@ -135,33 +149,89 @@ function App() {
 }
 
   const classifyImage = async (imgElement) => {
-    if (model) {
-      const tensor = tf.browser
-        .fromPixels(imgElement)
-        .resizeNearestNeighbor([224, 224])
-        .toFloat()
-        .expandDims();
-      const predictions = await model.classify(tensor);
-      console.log(predictions);
+    if (!cocoModel || !mobilenetModel) {
+      setMessage("AI models are still loading. Please wait...");
+      return;
+    }
 
-      const birdDetected = predictions.some((prediction) =>
-        birdClasses.includes(prediction.className.toLowerCase())
+    try {
+      // First, try COCO-SSD for bird detection (better for detecting birds at various distances)
+      const cocoPredictions = await cocoModel.detect(imgElement);
+      console.log('COCO-SSD predictions:', cocoPredictions);
+
+      // Check if COCO-SSD detected a bird
+      const birdDetectedByCoco = cocoPredictions.some(
+        (prediction) => prediction.class === 'bird'
       );
 
-      if (birdDetected) {
-        setMessage(
-          "Woah that bird is crazy, looks like a " +
-            predictions[0].className +
-            "! You should send it to Ryan!"
+      if (birdDetectedByCoco) {
+        // Bird detected by COCO-SSD, now use MobileNet for classification
+        const tensor = tf.browser
+          .fromPixels(imgElement)
+          .resizeNearestNeighbor([224, 224])
+          .toFloat()
+          .expandDims();
+        const mobilenetPredictions = await mobilenetModel.classify(tensor);
+        tensor.dispose(); // Clean up tensor
+        console.log('MobileNet predictions:', mobilenetPredictions);
+
+        const birdDetectedByMobilenet = mobilenetPredictions.some((prediction) =>
+          birdClasses.includes(prediction.className.toLowerCase())
         );
+
+        if (birdDetectedByMobilenet) {
+          setMessage(
+            "Woah that bird is crazy, looks like a " +
+              mobilenetPredictions[0].className +
+              "! You should send it to Ryan!"
+          );
+        } else {
+          setMessage(
+            "Bird detected! (Looks like a " +
+              mobilenetPredictions[0].className +
+              ") You should send it to Ryan!"
+          );
+        }
         setBirdImage(imgElement);
+        setShowSendAnyway(false);
       } else {
-        setMessage(
-          "This is not a bird! I think it is a " +
-            predictions[0].className +
-            ". Upload a bird image!"
+        // No bird detected by COCO-SSD, try MobileNet as fallback
+        const tensor = tf.browser
+          .fromPixels(imgElement)
+          .resizeNearestNeighbor([224, 224])
+          .toFloat()
+          .expandDims();
+        const mobilenetPredictions = await mobilenetModel.classify(tensor);
+        tensor.dispose(); // Clean up tensor
+
+        const birdDetectedByMobilenet = mobilenetPredictions.some((prediction) =>
+          birdClasses.includes(prediction.className.toLowerCase())
         );
+
+        if (birdDetectedByMobilenet) {
+          setMessage(
+            "Woah that bird is crazy, looks like a " +
+              mobilenetPredictions[0].className +
+              "! You should send it to Ryan!"
+          );
+          setBirdImage(imgElement);
+          setShowSendAnyway(false);
+        } else {
+          // No bird detected by either model
+          setMessage(
+            "No bird detected in this image. I think it might be a " +
+              mobilenetPredictions[0].className +
+              ". Are you sure there's a bird?"
+          );
+          setBirdImage(imgElement); // Still allow sending
+          setShowSendAnyway(true); // Show "send anyway" option
+        }
       }
+    } catch (error) {
+      console.error('Error classifying image:', error);
+      setMessage("Error analyzing image. You can still send it if you want!");
+      setBirdImage(imgElement);
+      setShowSendAnyway(true);
     }
   };
 
@@ -268,7 +338,16 @@ function App() {
         />
         <p>{message}</p>
         {birdImage && !sending && (
-          <button onClick={handleBirdSend}>Send Bird to Ryan</button>
+          <>
+            <button onClick={handleBirdSend}>
+              {showSendAnyway ? "Send Anyway" : "Send Bird to Ryan"}
+            </button>
+            {showSendAnyway && (
+              <p style={{ fontSize: '0.9em', color: '#666', marginTop: '10px' }}>
+                No bird was detected, but you can still send it if you're sure there's a bird!
+              </p>
+            )}
+          </>
         )}
         {sending && <p>Sending bird to Ryan...</p>}
         {image && <img id="uploadedImage" src={image} alt="Uploaded" />}
