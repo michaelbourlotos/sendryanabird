@@ -203,8 +203,10 @@ function App() {
             return;
           }
 
-          await response.json(); // Response confirmation
-          const imageUrl = `${workerUrl}/image/${fileName}`;
+          const data = await response.json();
+          // Use the filename returned by the Worker (it may have been sanitized/renamed)
+          const uploadedFileName = data.fileName || fileName;
+          const imageUrl = `${workerUrl}/image/${uploadedFileName}`;
           console.log(`File uploaded successfully at ${imageUrl}`);
           sendSMS(imageUrl);
         };
