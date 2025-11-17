@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import * as mobilenet from "@tensorflow-models/mobilenet";
 import * as tf from "@tensorflow/tfjs";
 import "./App.css";
@@ -9,7 +9,6 @@ function App() {
   const [model, setModel] = useState(null);
   const [lastImages, setLastImages] = useState([]);
   const [birdImage, setBirdImage] = useState(null);
-  const [extension, setExtension] = useState("");
   const [sending, setSending] = useState(false);
 
   const birdClasses = [
@@ -77,17 +76,7 @@ function App() {
   // R2 images are served through the Worker at /image/:filename
   const workerUrl = process.env.REACT_APP_WORKER_URL || '';
 
-  useEffect(() => {
-    const loadModel = async () => {
-      const loadedModel = await mobilenet.load({ version: 2, alpha: 1.0 });
-      setModel(loadedModel);
-    };
-
-    loadModel();
-    fetchLastImages();
-  }, []);
-
-  const fetchLastImages = async () => {
+  const fetchLastImages = useCallback(async () => {
     try {
       // Use Worker endpoint to list images (keeps R2 credentials secure)
       const response = await fetch(`${workerUrl}/list`, {
@@ -109,7 +98,17 @@ function App() {
     } catch (error) {
       console.error('Error fetching images:', error);
     }
-  };
+  }, [workerUrl]);
+
+  useEffect(() => {
+    const loadModel = async () => {
+      const loadedModel = await mobilenet.load({ version: 2, alpha: 1.0 });
+      setModel(loadedModel);
+    };
+
+    loadModel();
+    fetchLastImages();
+  }, [fetchLastImages]);
 
   const handleImageUpload = (event) => {
     const DESIRED_WIDTH = 400; 
@@ -128,7 +127,6 @@ function App() {
                 ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
                 const jpegImage = canvas.toDataURL('image/jpeg', 0.5);
                 setImage(jpegImage);
-                setExtension('jpeg');
                 classifyImage(imgElement);
             };
         };
