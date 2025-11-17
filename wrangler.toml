@@ -1,0 +1,22 @@
+name = "sendryanabird-worker"
+main = "worker/index.js"
+compatibility_date = "2024-01-01"
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "sendryanabird-bucket"
+
+# Environment variables (secrets should be set via wrangler secret put)
+# These will be set as secrets in Cloudflare Workers:
+# - TWILIO_ACCOUNT_SID
+# - TWILIO_AUTH_TOKEN
+# - TWILIO_PHONE_NUMBER
+
+# Uncomment and configure for production
+# [env.production]
+# name = "sendryanabird-worker-prod"
+# [[env.production.r2_buckets]]
+# binding = "R2_BUCKET"
+# bucket_name = "sendryanabird-bucket-prod"
+

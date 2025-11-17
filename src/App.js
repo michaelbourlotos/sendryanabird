@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import * as mobilenet from "@tensorflow-models/mobilenet";
 import * as tf from "@tensorflow/tfjs";
-import AWS from "aws-sdk";
 import "./App.css";
 
 function App() {
@@ -75,10 +74,7 @@ function App() {
     "albatross",
   ];
 
-  const S3_BUCKET = process.env.REACT_APP_S3_BUCKET;
-  const REGION = process.env.REACT_APP_AWS_REGION;
-  const ACCESS_KEY = process.env.REACT_APP_AWS_ACCESS_KEY;
-  const SECRET_ACCESS_KEY = process.env.REACT_APP_AWS_SECRET_ACCESS_KEY;
+  const R2_PUBLIC_URL = process.env.REACT_APP_R2_PUBLIC_URL;
 
   useEffect(() => {
     const loadModel = async () => {
@@ -91,33 +87,28 @@ function App() {
   }, []);
 
   const fetchLastImages = async () => {
-    AWS.config.update({
-      accessKeyId: ACCESS_KEY,
-      secretAccessKey: SECRET_ACCESS_KEY,
-      region: REGION,
-    });
+    try {
+      // Use Worker endpoint to list images (keeps R2 credentials secure)
+      const workerUrl = process.env.REACT_APP_WORKER_URL || '';
+      const response = await fetch(`${workerUrl}/list`, {
+        method: 'GET',
+      });
 
-    const s3 = new AWS.S3();
-    const params = {
-      Bucket: S3_BUCKET,
-    };
-
-    s3.listObjectsV2(params, (err, data) => {
-      if (err) {
-        console.log(err);
+      if (!response.ok) {
+        console.error('Failed to fetch images:', response.statusText);
         return;
       }
 
-      const sortedItems = data.Contents.sort(
-        (a, b) => new Date(b.LastModified) - new Date(a.LastModified)
-      );
-      const lastItems = sortedItems.slice(0, 4);
+      const data = await response.json();
+      const lastItems = data.images || [];
       const imageUrls = lastItems.map(
-        (item) => `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${item.Key}`
+        (item) => `${R2_PUBLIC_URL}/${item.Key}`
       );
 
       setLastImages(imageUrls);
-    });
+    } catch (error) {
+      console.error('Error fetching images:', error);
+    }
   };
 
   const handleImageUpload = (event) => {
@@ -176,15 +167,8 @@ function App() {
     }
   };
 
-  const uploadToS3 = async (imgElement) => {
+  const uploadToR2 = async (imgElement) => {
     setSending(true);
-    AWS.config.update({
-      accessKeyId: ACCESS_KEY,
-      secretAccessKey: SECRET_ACCESS_KEY,
-      region: REGION,
-    });
-
-    const s3 = new AWS.S3();
     const fileName = `bird-${Date.now()}.jpeg`;
 
     const canvas = document.createElement("canvas");
@@ -194,33 +178,55 @@ function App() {
     ctx.drawImage(imgElement, 0, 0);
 
     canvas.toBlob(async (blob) => {
-      const params = {
-        Bucket: S3_BUCKET,
-        Key: fileName,
-        Body: blob,
-        ContentType: `image/jpeg`,
-        // ACL: 'public-read',  // Ensure the uploaded file is publicly readable
-      };
+      try {
+        // Convert blob to base64 for easier transmission
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64data = reader.result.split(',')[1];
+          
+          // Upload via Worker proxy to keep R2 credentials secure
+          const workerUrl = process.env.REACT_APP_WORKER_URL || '';
+          const response = await fetch(`${workerUrl}/upload`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              fileName: fileName,
+              fileData: base64data,
+              contentType: 'image/jpeg',
+            }),
+          });
 
-      s3.upload(params, (err, data) => {
-        if (err) {
-          console.log(err);
-          setMessage("Failed to upload image. Please try again.");
-          return;
-        }
-        console.log(`File uploaded successfully at ${data.Location}`);
-        sendSMS(data.Location);
-        console.log(data.Location);
-      });
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Upload error:', errorData);
+            setMessage("Failed to upload image. Please try again.");
+            setSending(false);
+            return;
+          }
+
+          const data = await response.json();
+          const imageUrl = `${R2_PUBLIC_URL}/${fileName}`;
+          console.log(`File uploaded successfully at ${imageUrl}`);
+          sendSMS(imageUrl);
+        };
+        reader.readAsDataURL(blob);
+      } catch (error) {
+        console.error('Upload error:', error);
+        setMessage("Failed to upload image. Please try again.");
+        setSending(false);
+      }
     }, "image/jpeg");
   };
 
   const sendSMS = async (imageUrl) => {
     try {
+      const workerUrl = process.env.REACT_APP_WORKER_URL || '';
       const response = await fetch(
-        "https://7k5dfyeawk.execute-api.us-east-1.amazonaws.com/Dev",
+        `${workerUrl}/sms`,
         {
-          method: "post",
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
@@ -237,15 +243,20 @@ function App() {
         // reload the app to show the latest images
         window.location.reload();
       } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('SMS error:', errorData);
         alert("Failed to send message. Try again!");
+        setSending(false);
       }
     } catch (error) {
+      console.error('SMS error:', error);
       alert("An error occurred. Please try again.");
+      setSending(false);
     }
   };
 
   const handleBirdSend = () => {
-    uploadToS3(birdImage);
+    uploadToR2(birdImage);
   };
 
   return (
