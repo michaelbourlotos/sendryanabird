@@ -36,6 +36,11 @@ export default {
         return await handleSendSMS(request, env, corsHeaders);
       }
 
+      // Route: Serve images from R2
+      if (path.startsWith('/image/') && request.method === 'GET') {
+        return await handleServeImage(path, env, corsHeaders);
+      }
+
       return new Response('Not Found', { status: 404, headers: corsHeaders });
     } catch (error) {
       console.error('Worker error:', error);
@@ -218,6 +223,59 @@ async function handleSendSMS(request, env, corsHeaders) {
     console.error('Error sending SMS:', error);
     return new Response(
       JSON.stringify({ error: 'Failed to send SMS', details: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
+/**
+ * Serve images from R2 bucket
+ */
+async function handleServeImage(path, env, corsHeaders) {
+  try {
+    const bucket = env.R2_BUCKET;
+    if (!bucket) {
+      throw new Error('R2_BUCKET not configured');
+    }
+
+    // Extract filename from path (e.g., /image/bird-123.jpeg -> bird-123.jpeg)
+    const filename = path.replace('/image/', '');
+    
+    if (!filename) {
+      return new Response('Filename required', {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    // Get object from R2
+    const object = await bucket.get(filename);
+
+    if (!object) {
+      return new Response('Image not found', {
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    // Get the content type from object metadata or default to image/jpeg
+    const contentType = object.httpMetadata?.contentType || 'image/jpeg';
+
+    // Return the image with appropriate headers
+    return new Response(object.body, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
+      },
+    });
+  } catch (error) {
+    console.error('Error serving image:', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to serve image' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

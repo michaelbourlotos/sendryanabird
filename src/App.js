@@ -74,7 +74,8 @@ function App() {
     "albatross",
   ];
 
-  const R2_PUBLIC_URL = process.env.REACT_APP_R2_PUBLIC_URL;
+  // R2 images are served through the Worker at /image/:filename
+  const workerUrl = process.env.REACT_APP_WORKER_URL || '';
 
   useEffect(() => {
     const loadModel = async () => {
@@ -89,7 +90,6 @@ function App() {
   const fetchLastImages = async () => {
     try {
       // Use Worker endpoint to list images (keeps R2 credentials secure)
-      const workerUrl = process.env.REACT_APP_WORKER_URL || '';
       const response = await fetch(`${workerUrl}/list`, {
         method: 'GET',
       });
@@ -102,7 +102,7 @@ function App() {
       const data = await response.json();
       const lastItems = data.images || [];
       const imageUrls = lastItems.map(
-        (item) => `${R2_PUBLIC_URL}/${item.Key}`
+        (item) => `${workerUrl}/image/${item.Key}`
       );
 
       setLastImages(imageUrls);
@@ -185,7 +185,6 @@ function App() {
           const base64data = reader.result.split(',')[1];
           
           // Upload via Worker proxy to keep R2 credentials secure
-          const workerUrl = process.env.REACT_APP_WORKER_URL || '';
           const response = await fetch(`${workerUrl}/upload`, {
             method: 'POST',
             headers: {
@@ -206,8 +205,8 @@ function App() {
             return;
           }
 
-          const data = await response.json();
-          const imageUrl = `${R2_PUBLIC_URL}/${fileName}`;
+          await response.json(); // Response confirmation
+          const imageUrl = `${workerUrl}/image/${fileName}`;
           console.log(`File uploaded successfully at ${imageUrl}`);
           sendSMS(imageUrl);
         };
@@ -222,7 +221,6 @@ function App() {
 
   const sendSMS = async (imageUrl) => {
     try {
-      const workerUrl = process.env.REACT_APP_WORKER_URL || '';
       const response = await fetch(
         `${workerUrl}/sms`,
         {
