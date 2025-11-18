@@ -13,6 +13,7 @@ function App() {
   const [birdImage, setBirdImage] = useState(null);
   const [sending, setSending] = useState(false);
   const [showSendAnyway, setShowSendAnyway] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const birdClasses = [
     "cock",
@@ -141,6 +142,7 @@ function App() {
                 const jpegImage = canvas.toDataURL('image/jpeg', 0.5);
                 setImage(jpegImage);
                 setShowSendAnyway(false);
+                setAnalyzing(true);
                 classifyImage(imgElement);
             };
         };
@@ -151,6 +153,7 @@ function App() {
   const classifyImage = async (imgElement) => {
     if (!cocoModel || !mobilenetModel) {
       setMessage("AI models are still loading. Please wait...");
+      setAnalyzing(false);
       return;
     }
 
@@ -232,6 +235,8 @@ function App() {
       setMessage("Error analyzing image. You can still send it if you want!");
       setBirdImage(imgElement);
       setShowSendAnyway(true);
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -336,8 +341,16 @@ function App() {
           accept="image/*"
           onInput={handleImageUpload}
         />
-        <p>{message}</p>
-        {birdImage && !sending && (
+        {(analyzing || sending) && (
+          <div className="loading-container">
+            <div className="spinner"></div>
+            <p className="loading-text">
+              {analyzing ? "Analyzing image for birds..." : "Sending bird to Ryan..."}
+            </p>
+          </div>
+        )}
+        {!analyzing && !sending && <p>{message}</p>}
+        {birdImage && !sending && !analyzing && (
           <>
             <button onClick={handleBirdSend}>
               {showSendAnyway ? "Send Anyway" : "Send Bird to Ryan"}
@@ -349,7 +362,6 @@ function App() {
             )}
           </>
         )}
-        {sending && <p>Sending bird to Ryan...</p>}
         {image && <img id="uploadedImage" src={image} alt="Uploaded" />}
       </div>
       <div>
