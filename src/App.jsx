@@ -19,6 +19,39 @@ function App() {
   const [showSendAnyway, setShowSendAnyway] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
 
+  const birdMessages = [
+    "Check out this little beauty!",
+    "Look at this absolute stunner!",
+    "What a gorgeous bird!",
+    "This one's a real looker!",
+    "Behold this feathered friend!",
+    "Check out this absolute unit!",
+    "What a magnificent creature!",
+    "Look at this beauty!",
+    "This bird is incredible!",
+    "What a stunning specimen!",
+    "Check out this cutie!",
+    "Look at this absolute gem!",
+    "What a beautiful bird!",
+    "This one's a real charmer!",
+    "Behold this little legend!",
+    "Check out this absolute beauty!",
+    "What a gorgeous little bird!",
+    "Look at this stunner!",
+    "This bird is amazing!",
+    "What a magnificent bird!",
+    "Check out this feathered friend!",
+    "Look at this absolute beauty!",
+    "What a stunning bird!",
+    "This one's incredible!",
+    "Behold this gorgeous creature!",
+    "Check out this looker!",
+    "What a beautiful specimen!",
+    "Look at this little gem!",
+    "This bird is a real stunner!",
+    "What an absolute beauty!",
+  ];
+
   const birdClasses = [
     "cock",
     "hen",
@@ -122,15 +155,20 @@ function App() {
         setMobilenetModel(loadedMobilenet);
         setCocoModel(loadedCoco);
         setModelsLoading(false);
+        
+        // Only fetch images after models are loaded
+        // This ensures upload functionality is ready first
+        fetchLastImages();
       } catch (error) {
         console.error('Error loading models:', error);
         setMessage('Error loading AI models. Please refresh the page.');
         setModelsLoading(false);
+        // Still try to fetch images even if models fail
+        fetchLastImages();
       }
     };
 
     loadModels();
-    fetchLastImages();
   }, [fetchLastImages]);
 
   const handleImageUpload = (event) => {
@@ -303,6 +341,10 @@ function App() {
     }, "image/jpeg");
   };
 
+  const getRandomBirdMessage = () => {
+    return birdMessages[Math.floor(Math.random() * birdMessages.length)];
+  };
+
   const sendSMS = async (imageUrl) => {
     try {
       const response = await fetch(
@@ -313,7 +355,7 @@ function App() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            message: "Check out this little beauty!",
+            message: getRandomBirdMessage(),
             recipientPhoneNumber: "+17573030776",
             mediaUrl: imageUrl,
           }),
@@ -343,7 +385,9 @@ function App() {
 
   return (
     <div className="App">
-      <h1>Send Ryan A Bird</h1>
+      <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-8 text-center text-white tracking-tight drop-shadow-2xl">
+        Send Ryan A Bird
+      </h1>
       <div className="upload-area">
         <div className="relative w-full max-w-md">
           <input
@@ -363,7 +407,8 @@ function App() {
             {modelsLoading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Bird experts loading...
+                Bird experts loading... <br />
+                This may take a while on slower connections.
               </>
             ) : analyzing || sending ? (
               <>
@@ -407,8 +452,10 @@ function App() {
         )}
         {image && <img id="uploadedImage" src={image} alt="Uploaded" className="mt-4" />}
       </div>
-      <div>
-        <h3>Latest birds sent to Ryan</h3>
+      <div className="w-full max-w-7xl px-4">
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold mb-8 text-center mt-12 text-white tracking-tight drop-shadow-lg">
+          Latest Birds Sent to Ryan
+        </h2>
         <div className="latest-birds">
           {Array.from({ length: 12 }).map((_, index) => {
             const imgUrl = lastImages[index];
