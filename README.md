@@ -81,7 +81,7 @@ This ensures the app stays within the free tier and doesn't incur unexpected cos
    - **Build output directory**: `build`
    - **Root directory**: `/` (leave as default)
 5. Add environment variable:
-   - **Variable name**: `REACT_APP_WORKER_URL`
+   - **Variable name**: `VITE_WORKER_URL`
    - **Value**: Your Worker URL (e.g., `https://sendryanabird-worker.your-subdomain.workers.dev`)
 
 ### Local Development
@@ -89,7 +89,7 @@ This ensures the app stays within the free tier and doesn't incur unexpected cos
 For local development, create a `.env` file in the root directory:
 
 ```
-REACT_APP_WORKER_URL=https://sendryanabird-worker.your-subdomain.workers.dev
+VITE_WORKER_URL=https://sendryanabird-worker.your-subdomain.workers.dev
 ```
 
 Then run:
@@ -129,7 +129,7 @@ wrangler deploy
 
 ### Environment Variables
 
-- **Cloudflare Pages**: Set `REACT_APP_WORKER_URL` in the Pages dashboard (Settings → Environment variables)
+- **Cloudflare Pages**: Set `VITE_WORKER_URL` in the Pages dashboard (Settings → Environment variables)
 - **Cloudflare Worker**: Secrets are set via `wrangler secret put` commands (see Setup section)
 
 Note: Images are served through the Worker at `/image/:filename`, so no separate R2 public URL configuration is needed.

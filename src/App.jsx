@@ -364,8 +364,9 @@ function App() {
 
       if (response.ok) {
         alert("The bird has been sent to Ryan, you're a hero!");
-        // reload the app to show the latest images
-        window.location.reload();
+        // Reset form and fetch latest images
+        resetForm();
+        fetchLastImages();
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('SMS error:', errorData);
@@ -376,6 +377,20 @@ function App() {
       console.error('SMS error:', error);
       alert("An error occurred. Please try again.");
       setSending(false);
+    }
+  };
+
+  const resetForm = () => {
+    setImage(null);
+    setBirdImage(null);
+    setMessage("");
+    setShowSendAnyway(false);
+    setSending(false);
+    setAnalyzing(false);
+    // Clear the file input
+    const fileInput = document.getElementById('file-upload');
+    if (fileInput) {
+      fileInput.value = '';
     }
   };
 
