@@ -1,6 +1,6 @@
 Send Ryan a Bird
 
-App loads last four images uploaded to Cloudflare R2 bucket.
+App loads last 12 images uploaded to Cloudflare R2 bucket.
 User uploads image.
 Tensorflow mobilenet model checks that image contains a bird.
 Image is uploaded to R2 bucket via Cloudflare Worker, then Worker sends media message via Twilio.
@@ -16,7 +16,7 @@ Image is uploaded to R2 bucket via Cloudflare Worker, then Worker sends media me
 
 The Worker provides the following API endpoints:
 
-- `GET /list` - Returns the last 4 images from R2 bucket
+- `GET /list` - Returns the last 12 images from R2 bucket
 - `POST /upload` - Uploads an image to R2 bucket
 - `POST /sms` - Sends SMS via Twilio with media attachment
 - `GET /image/:filename` - Serves images from R2 bucket

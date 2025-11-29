@@ -278,7 +278,7 @@ const worker = {
 export default worker;
 
 /**
- * List the last 4 images from R2 bucket
+ * List the last 12 images from R2 bucket
  */
 async function handleListImages(env, corsHeaders) {
   try {
@@ -290,14 +290,14 @@ async function handleListImages(env, corsHeaders) {
     // List objects from R2
     const result = await bucket.list();
     
-    // Sort by uploaded date (newest first) and take last 4
+    // Sort by uploaded date (newest first) and take last 12
     const sortedObjects = result.objects
       .sort((a, b) => {
         const dateA = a.uploaded instanceof Date ? a.uploaded : new Date(a.uploaded);
         const dateB = b.uploaded instanceof Date ? b.uploaded : new Date(b.uploaded);
         return dateB - dateA;
       })
-      .slice(0, 4)
+      .slice(0, 12)
       .map(obj => ({
         Key: obj.key,
         LastModified: obj.uploaded instanceof Date ? obj.uploaded.toISOString() : obj.uploaded,

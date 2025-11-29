@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import * as mobilenet from "@tensorflow-models/mobilenet";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import * as tf from "@tensorflow/tfjs";
+import { Button } from "@/components/ui/button";
+import { Loader2, Upload, Send } from "lucide-react";
 import "./App.css";
 
 function App() {
@@ -9,7 +11,9 @@ function App() {
   const [message, setMessage] = useState("");
   const [mobilenetModel, setMobilenetModel] = useState(null);
   const [cocoModel, setCocoModel] = useState(null);
+  const [modelsLoading, setModelsLoading] = useState(true);
   const [lastImages, setLastImages] = useState([]);
+  const [imageLoadStates, setImageLoadStates] = useState({});
   const [birdImage, setBirdImage] = useState(null);
   const [sending, setSending] = useState(false);
   const [showSendAnyway, setShowSendAnyway] = useState(false);
@@ -78,7 +82,7 @@ function App() {
   ];
 
   // R2 images are served through the Worker at /image/:filename
-  const workerUrl = process.env.REACT_APP_WORKER_URL || '';
+  const workerUrl = import.meta.env.VITE_WORKER_URL || '';
 
   const fetchLastImages = useCallback(async () => {
     try {
@@ -99,6 +103,8 @@ function App() {
       );
 
       setLastImages(imageUrls);
+      // Reset load states for new images
+      setImageLoadStates({});
     } catch (error) {
       console.error('Error fetching images:', error);
     }
@@ -107,6 +113,7 @@ function App() {
   useEffect(() => {
     const loadModels = async () => {
       try {
+        setModelsLoading(true);
         // Load both models in parallel
         const [loadedMobilenet, loadedCoco] = await Promise.all([
           mobilenet.load({ version: 2, alpha: 1.0 }),
@@ -114,9 +121,11 @@ function App() {
         ]);
         setMobilenetModel(loadedMobilenet);
         setCocoModel(loadedCoco);
+        setModelsLoading(false);
       } catch (error) {
         console.error('Error loading models:', error);
         setMessage('Error loading AI models. Please refresh the page.');
+        setModelsLoading(false);
       }
     };
 
@@ -336,40 +345,101 @@ function App() {
     <div className="App">
       <h1>Send Ryan A Bird</h1>
       <div className="upload-area">
-        <input
-          type="file"
-          accept="image/*"
-          onInput={handleImageUpload}
-        />
+        <div className="relative w-full max-w-md">
+          <input
+            type="file"
+            accept="image/*"
+            onInput={handleImageUpload}
+            disabled={modelsLoading || analyzing || sending}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10 disabled:pointer-events-none"
+            id="file-upload"
+          />
+          <Button
+            size="lg"
+            disabled={modelsLoading || analyzing || sending}
+            className="w-full pointer-events-none"
+            variant={modelsLoading ? "secondary" : "default"}
+          >
+            {modelsLoading ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Bird experts loading...
+              </>
+            ) : analyzing || sending ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                {analyzing ? "Analyzing..." : "Sending..."}
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-5 w-5" />
+                Upload Bird Photo
+              </>
+            )}
+          </Button>
+        </div>
         {(analyzing || sending) && (
           <div className="loading-container">
-            <div className="spinner"></div>
             <p className="loading-text">
               {analyzing ? "Analyzing image for birds..." : "Sending bird to Ryan..."}
             </p>
           </div>
         )}
-        {!analyzing && !sending && <p>{message}</p>}
+        {!analyzing && !sending && message && (
+          <p className="text-center max-w-md">{message}</p>
+        )}
         {birdImage && !sending && !analyzing && (
           <>
-            <button onClick={handleBirdSend}>
+            <Button
+              onClick={handleBirdSend}
+              size="lg"
+              className="w-full max-w-md mt-4"
+            >
+              <Send className="mr-2 h-5 w-5" />
               {showSendAnyway ? "Send Anyway" : "Send Bird to Ryan"}
-            </button>
+            </Button>
             {showSendAnyway && (
-              <p style={{ fontSize: '0.9em', color: '#666', marginTop: '10px' }}>
+              <p className="text-sm text-muted-foreground mt-2 max-w-md text-center">
                 No bird was detected, but you can still send it if you're sure there's a bird!
               </p>
             )}
           </>
         )}
-        {image && <img id="uploadedImage" src={image} alt="Uploaded" />}
+        {image && <img id="uploadedImage" src={image} alt="Uploaded" className="mt-4" />}
       </div>
       <div>
-        <h3>Lastest birds sent to Ryan</h3>
+        <h3>Latest birds sent to Ryan</h3>
         <div className="latest-birds">
-          {lastImages.map((imgUrl, index) => (
-            <img key={index} src={imgUrl} alt={`Last uploaded ${index + 1}`} />
-          ))}
+          {Array.from({ length: 12 }).map((_, index) => {
+            const imgUrl = lastImages[index];
+            const isLoading = imgUrl && !imageLoadStates[imgUrl];
+            
+            return (
+              <div key={index} className="relative w-full aspect-square rounded-lg overflow-hidden">
+                {imgUrl ? (
+                  <>
+                    {isLoading && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-muted via-muted/50 to-muted animate-pulse" />
+                    )}
+                    <img
+                      src={imgUrl}
+                      alt={`Last uploaded ${index + 1}`}
+                      loading="lazy"
+                      onLoad={() => setImageLoadStates(prev => ({ ...prev, [imgUrl]: true }))}
+                      onError={() => setImageLoadStates(prev => ({ ...prev, [imgUrl]: true }))}
+                      className={`w-full h-full object-cover rounded-lg transition-opacity duration-500 ${
+                        isLoading ? 'opacity-0' : 'opacity-100'
+                      }`}
+                    />
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted via-muted/50 to-muted">
+                    <div className="text-muted-foreground text-xs opacity-50">No image yet</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
