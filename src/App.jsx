@@ -4,7 +4,7 @@ import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import * as tf from "@tensorflow/tfjs";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Upload, Send } from "lucide-react";
+import { Loader2, Upload, Send, Bird } from "lucide-react";
 import "./App.css";
 
 function App() {
@@ -441,8 +441,12 @@ function App() {
 
   return (
     <div className="App">
-      <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-8 text-center text-white tracking-tight drop-shadow-2xl">
-        Send Ryan A Bird
+      <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-8 text-center text-white tracking-tight drop-shadow-2xl flex items-center justify-center gap-4">
+        <Bird className="h-12 w-12 md:h-16 md:w-16 lg:h-20 lg:w-20 text-yellow-400 drop-shadow-lg animate-bounce" />
+        <span className="bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-400 bg-clip-text text-transparent">
+          Send Ryan A Bird
+        </span>
+        <Bird className="h-12 w-12 md:h-16 md:w-16 lg:h-20 lg:w-20 text-pink-400 drop-shadow-lg animate-bounce" style={{ animationDelay: '0.5s' }} />
       </h1>
       <p className="text-center text-white text-sm mb-4">
         Upload a photo of a bird and text it to Ryan, anonymously.......
