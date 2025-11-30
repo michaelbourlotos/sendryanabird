@@ -397,7 +397,7 @@ function App() {
           },
           body: JSON.stringify({
             message: getRandomBirdMessage(),
-            recipientPhoneNumber: "+17573030776",
+            recipientPhoneNumber: "+18044772881",
             mediaUrl: imageUrl,
           }),
         }
@@ -472,11 +472,11 @@ function App() {
                 <Loader2 className="h-5 w-5 animate-spin" />
                 <div className="w-full space-y-2">
                   <div className="text-sm font-medium">
-                    Bird experts loading... {Math.round(loadingProgress)}%
+                    Please wait while Bird experts load... {Math.round(loadingProgress)}%
                   </div>
                   <Progress value={loadingProgress} className="h-2.5" />
                   <div className="text-xs text-muted-foreground">
-                    This may take a while on slower connections
+                    This may take a while on slower connections.
                   </div>
                 </div>
               </div>
