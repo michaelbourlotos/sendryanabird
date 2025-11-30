@@ -441,7 +441,7 @@ function App() {
 
   return (
     <div className="App">
-      <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-8 text-center text-white tracking-tight drop-shadow-2xl flex items-center justify-center gap-4">
+      <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-8 text-center text-white tracking-tight drop-shadow-2xl flex items-center justify-center gap-4 mt-12">
         <Bird className="h-12 w-12 md:h-16 md:w-16 lg:h-20 lg:w-20 text-yellow-400 drop-shadow-lg animate-bounce" />
         <span className="bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-400 bg-clip-text text-transparent">
           Send Ryan A Bird
