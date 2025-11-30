@@ -3,6 +3,7 @@ import * as mobilenet from "@tensorflow-models/mobilenet";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import * as tf from "@tensorflow/tfjs";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Loader2, Upload, Send } from "lucide-react";
 import "./App.css";
 
@@ -12,6 +13,7 @@ function App() {
   const [mobilenetModel, setMobilenetModel] = useState(null);
   const [cocoModel, setCocoModel] = useState(null);
   const [modelsLoading, setModelsLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [lastImages, setLastImages] = useState([]);
   const [imageLoadStates, setImageLoadStates] = useState({});
   const [birdImage, setBirdImage] = useState(null);
@@ -144,27 +146,47 @@ function App() {
   }, [workerUrl]);
 
   useEffect(() => {
+    // Load images immediately - don't wait for models
+    fetchLastImages();
+    
     const loadModels = async () => {
       try {
         setModelsLoading(true);
+        setLoadingProgress(0);
+        
+        // Simulate progress updates
+        const progressInterval = setInterval(() => {
+          setLoadingProgress((prev) => {
+            // Slow down as we approach 90% (wait for actual completion)
+            if (prev < 90) {
+              return Math.min(prev + Math.random() * 5, 90);
+            }
+            return prev;
+          });
+        }, 200);
+        
         // Load both models in parallel
         const [loadedMobilenet, loadedCoco] = await Promise.all([
           mobilenet.load({ version: 2, alpha: 1.0 }),
           cocoSsd.load()
         ]);
+        
+        clearInterval(progressInterval);
+        setLoadingProgress(100);
+        
         setMobilenetModel(loadedMobilenet);
         setCocoModel(loadedCoco);
-        setModelsLoading(false);
         
-        // Only fetch images after models are loaded
-        // This ensures upload functionality is ready first
-        fetchLastImages();
+        // Small delay to show 100% completion
+        setTimeout(() => {
+          setModelsLoading(false);
+          setLoadingProgress(0);
+        }, 300);
       } catch (error) {
         console.error('Error loading models:', error);
         setMessage('Error loading AI models. Please refresh the page.');
         setModelsLoading(false);
-        // Still try to fetch images even if models fail
-        fetchLastImages();
+        setLoadingProgress(0);
       }
     };
 
@@ -291,12 +313,31 @@ function App() {
     setSending(true);
     const fileName = `bird-${Date.now()}.jpeg`;
 
-    const canvas = document.createElement("canvas");
-    canvas.width = imgElement.naturalWidth;
-    canvas.height = imgElement.naturalHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(imgElement, 0, 0);
+    // Resize image to max 1200px width for smaller file size while maintaining quality
+    const MAX_WIDTH = 1200;
+    const MAX_HEIGHT = 1200;
+    
+    let width = imgElement.naturalWidth;
+    let height = imgElement.naturalHeight;
+    
+    // Calculate new dimensions maintaining aspect ratio
+    if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+      const scale = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
 
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    
+    // Use high-quality image rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(imgElement, 0, 0, width, height);
+
+    // Compress to JPEG with 0.75 quality (good balance between quality and size)
     canvas.toBlob(async (blob) => {
       try {
         // Convert blob to base64 for easier transmission
@@ -338,7 +379,7 @@ function App() {
         setMessage("Failed to upload image. Please try again.");
         setSending(false);
       }
-    }, "image/jpeg");
+    }, "image/jpeg", 0.75); // 0.75 quality = good balance (0.0 to 1.0)
   };
 
   const getRandomBirdMessage = () => {
@@ -403,6 +444,9 @@ function App() {
       <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-8 text-center text-white tracking-tight drop-shadow-2xl">
         Send Ryan A Bird
       </h1>
+      <p className="text-center text-white text-sm mb-4">
+        Upload a photo of a bird and text it to Ryan, anonymously.......
+      </p>
       <div className="upload-area">
         <div className="relative w-full max-w-md">
           <input
@@ -416,15 +460,22 @@ function App() {
           <Button
             size="lg"
             disabled={modelsLoading || analyzing || sending}
-            className="w-full pointer-events-none"
+            className="w-full pointer-events-none min-h-[120px]"
             variant={modelsLoading ? "secondary" : "default"}
           >
             {modelsLoading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Bird experts loading... <br />
-                This may take a while on slower connections.
-              </>
+              <div className="w-full flex flex-col items-center gap-3 py-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <div className="w-full space-y-2">
+                  <div className="text-sm font-medium">
+                    Bird experts loading... {Math.round(loadingProgress)}%
+                  </div>
+                  <Progress value={loadingProgress} className="h-2.5" />
+                  <div className="text-xs text-muted-foreground">
+                    This may take a while on slower connections
+                  </div>
+                </div>
+              </div>
             ) : analyzing || sending ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
